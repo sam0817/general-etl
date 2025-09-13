@@ -15,7 +15,7 @@ pub struct EtlPipeline {
 impl EtlPipeline {
     pub fn new(base_url: String) -> Self {
         Self {
-            api_client: ApiClient::new(base_url),
+            api_client: ApiClient::new(),
             processor: DataProcessor::new(),
             csv_writer: CsvWriter::new(b','),
         }
@@ -56,15 +56,15 @@ impl EtlPipeline {
     async fn extract_data(&self, source: &DataSource) -> Result<Vec<DataRecord>> {
         match source {
             DataSource::Api(endpoint) => {
-                let json = self.api_client.fetch_json(endpoint).await?;
+                let json = self.api_client.fetch_json(endpoint, None, None, None, None).await?;
                 self.parse_json_to_records(json)
             }
             DataSource::CsvApi(endpoint) => {
-                let csv_data = self.api_client.fetch_csv(endpoint).await?;
+                let csv_data = self.api_client.fetch_text(endpoint, None, None, None, None).await?;
                 self.parse_csv_to_records(&csv_data)
             }
             DataSource::ZipApi(endpoint) => {
-                let zip_data = self.api_client.fetch_zip(endpoint).await?;
+                let zip_data = self.api_client.fetch_bytes(endpoint, None, None, None, None).await?;
                 self.extract_and_parse_zip(zip_data)
             }
         }

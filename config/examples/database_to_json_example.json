@@ -1,0 +1,98 @@
+{
+  "name": "Database User Export",
+  "description": "從資料庫導出使用者資料並轉換為 JSON 格式",
+  "data_source": {
+    "type": "database",
+    "connection_string": "mysql://user:password@localhost:3306/userdb",
+    "query": "SELECT id, username, email, created_at, last_login, status FROM users WHERE status = 'active' ORDER BY created_at DESC",
+    "driver": "mysql"
+  },
+  "transformations": [
+    {
+      "name": "mask_email",
+      "source_field": "email",
+      "target_field": "masked_email",
+      "transformation": {
+        "type": "custom",
+        "function": "mask_email",
+        "parameters": {
+          "mask_char": "*",
+          "preserve_domain": true
+        }
+      }
+    },
+    {
+      "name": "calculate_days_since_login",
+      "source_field": "last_login",
+      "target_field": "days_inactive",
+      "transformation": {
+        "type": "calculate",
+        "expression": "days_between(now(), last_login)"
+      }
+    },
+    {
+      "name": "user_activity_status",
+      "source_field": "days_inactive",
+      "target_field": "activity_status",
+      "transformation": {
+        "type": "map",
+        "mapping": {
+          "0-7": "Active",
+          "8-30": "Moderate",
+          "31-90": "Low",
+          "91+": "Inactive"
+        }
+      }
+    },
+    {
+      "name": "format_user_profile",
+      "source_field": "username",
+      "target_field": "user_profile",
+      "transformation": {
+        "type": "format",
+        "template": "User: {username} ({masked_email}) - Status: {activity_status}"
+      }
+    },
+    {
+      "name": "filter_recent_users",
+      "source_field": "created_at",
+      "transformation": {
+        "type": "filter", 
+        "condition": "created_at > date_sub(now(), interval 1 year)"
+      }
+    }
+  ],
+  "output": {
+    "format": {
+      "json": {
+        "pretty_print": true
+      }
+    },
+    "destination": {
+      "type": "s3",
+      "bucket": "data-exports",
+      "key": "users/export_{timestamp}.json",
+      "region": "us-west-2",
+      "credentials": {
+        "access_key_id": "${AWS_ACCESS_KEY}",
+        "secret_access_key": "${AWS_SECRET_KEY}"
+      }
+    },
+    "options": {
+      "batch_size": 1000,
+      "filename_template": "users_export_{date}_{batch}.json",
+      "max_file_size": 52428800
+    }
+  },
+  "settings": {
+    "parallel_workers": 1,
+    "memory_limit_mb": 1024,
+    "temp_directory": "/tmp/etl",
+    "log_level": "info",
+    "timeout_seconds": 1200,
+    "variables": {
+      "AWS_ACCESS_KEY": "your-aws-access-key",
+      "AWS_SECRET_KEY": "your-aws-secret-key"
+    }
+  }
+}

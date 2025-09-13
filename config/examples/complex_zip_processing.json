@@ -1,0 +1,105 @@
+{
+  "name": "Complex ZIP File Processing",
+  "description": "處理壓縮檔案中的多個 CSV 文件並進行複雜轉換",
+  "data_source": {
+    "type": "local_file",
+    "path": "data/monthly_reports.zip",
+    "format": {
+      "zip": {
+        "extract_path": "temp/extracted",
+        "target_files": ["sales_*.csv", "inventory_*.csv"]
+      }
+    }
+  },
+  "transformations": [
+    {
+      "name": "join_sales_inventory",
+      "source_field": "product_id",
+      "target_field": "enriched_product",
+      "transformation": {
+        "type": "join",
+        "join_source": "inventory_data",
+        "join_key": "product_id", 
+        "join_type": "left"
+      }
+    },
+    {
+      "name": "calculate_inventory_turnover",
+      "source_field": "sales_quantity",
+      "target_field": "turnover_rate",
+      "transformation": {
+        "type": "calculate",
+        "expression": "sales_quantity / stock_quantity * 100"
+      }
+    },
+    {
+      "name": "categorize_turnover",
+      "source_field": "turnover_rate",
+      "target_field": "turnover_category",
+      "transformation": {
+        "type": "calculate",
+        "expression": "case when turnover_rate > 80 then 'High' when turnover_rate > 50 then 'Medium' else 'Low' end"
+      }
+    },
+    {
+      "name": "aggregate_by_category",
+      "source_field": "revenue",
+      "target_field": "category_revenue",
+      "transformation": {
+        "type": "aggregate",
+        "operation": "sum",
+        "group_by": ["product_category", "month"]
+      }
+    },
+    {
+      "name": "format_report_line",
+      "source_field": "product_name",
+      "target_field": "report_summary",
+      "transformation": {
+        "type": "format",
+        "template": "{product_name} ({product_category}): ${revenue:,.2f} - Turnover: {turnover_category}"
+      }
+    },
+    {
+      "name": "filter_profitable_products",
+      "source_field": "revenue",
+      "transformation": {
+        "type": "filter",
+        "condition": "revenue > 1000"
+      },
+      "condition": {
+        "field": "turnover_category",
+        "operator": "not_equal",
+        "value": "Low"
+      }
+    }
+  ],
+  "output": {
+    "format": {
+      "excel": {
+        "sheet_name": "Monthly_Analysis"
+      }
+    },
+    "destination": {
+      "type": "local_file",
+      "path": "reports/monthly_analysis_{month}.xlsx",
+      "compress": "zip"
+    },
+    "options": {
+      "batch_size": 2000,
+      "split_by_field": "product_category",
+      "filename_template": "analysis_{category}_{date}.xlsx"
+    }
+  },
+  "settings": {
+    "parallel_workers": 8,
+    "memory_limit_mb": 2048,
+    "temp_directory": "temp/processing",
+    "log_level": "info",
+    "timeout_seconds": 1800,
+    "variables": {
+      "PROCESSING_DATE": "${DATE}",
+      "OUTPUT_VERSION": "v2.1"
+    }
+  }
+}

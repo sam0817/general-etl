@@ -1,0 +1,104 @@
+{
+  "name": "API Product Data ETL",
+  "description": "從 API 提取產品資料並轉換為 CSV 格式",
+  "data_source": {
+    "type": "api",
+    "url": "https://api.example.com/products",
+    "method": "GET",
+    "headers": {
+      "Accept": "application/json",
+      "User-Agent": "ETL-Pipeline/1.0"
+    },
+    "auth": {
+      "auth_type": "bearer_token",
+      "credentials": {
+        "token": "${API_TOKEN}"
+      }
+    },
+    "retry": {
+      "max_attempts": 3,
+      "initial_delay_ms": 1000,
+      "max_delay_ms": 10000,
+      "backoff_multiplier": 2.0
+    }
+  },
+  "transformations": [
+    {
+      "name": "extract_id",
+      "source_field": "product_id", 
+      "target_field": "id",
+      "transformation": {
+        "type": "convert",
+        "to_type": "string"
+      }
+    },
+    {
+      "name": "normalize_name",
+      "source_field": "product_name",
+      "target_field": "name", 
+      "transformation": {
+        "type": "format",
+        "template": "{product_name}"
+      }
+    },
+    {
+      "name": "calculate_discounted_price",
+      "source_field": "price",
+      "target_field": "final_price",
+      "transformation": {
+        "type": "calculate",
+        "expression": "price * (1 - discount_rate / 100)"
+      }
+    },
+    {
+      "name": "categorize_product",
+      "source_field": "category_id",
+      "target_field": "category_name",
+      "transformation": {
+        "type": "map",
+        "mapping": {
+          "1": "Electronics",
+          "2": "Clothing",
+          "3": "Books", 
+          "4": "Home & Garden"
+        }
+      }
+    },
+    {
+      "name": "filter_active_products",
+      "source_field": "status",
+      "transformation": {
+        "type": "filter",
+        "condition": "status == 'active'"
+      }
+    }
+  ],
+  "output": {
+    "format": {
+      "csv": {
+        "delimiter": ",",
+        "quote_char": "\"",
+        "headers": true
+      }
+    },
+    "destination": {
+      "type": "local_file",
+      "path": "output/products.csv",
+      "compress": "gzip"
+    },
+    "options": {
+      "batch_size": 1000,
+      "max_file_size": 104857600
+    }
+  },
+  "settings": {
+    "parallel_workers": 4,
+    "memory_limit_mb": 512,
+    "temp_directory": "temp",
+    "log_level": "info",
+    "timeout_seconds": 300,
+    "variables": {
+      "API_TOKEN": "your-api-token-here"
+    }
+  }
+}

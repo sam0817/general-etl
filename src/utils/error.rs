@@ -6,6 +6,12 @@ pub enum EtlError {
     #[error("API request failed: {0}")]
     ApiError(String),
 
+    #[error("HTTP error {0}: {1}")]
+    HttpError(u16, String),
+
+    #[error("Request error: {0}")]
+    RequestError(String),
+
     #[error("Data parsing error: {0}")]
     ParseError(String),
 
@@ -26,6 +32,15 @@ pub enum EtlError {
 
     #[error("Transformation error: {0}")]
     TransformError(String),
+
+    #[error("Database error: {0}")]
+    DatabaseError(String),
+
+    #[error("Authentication error: {0}")]
+    AuthError(String),
+
+    #[error("Validation error: {0}")]
+    ValidationError(String),
 }
 
 pub type Result<T> = std::result::Result<T, EtlError>;

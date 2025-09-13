@@ -1,0 +1,89 @@
+{
+  "name": "CSV Sales Data Processing",
+  "description": "處理本地 CSV 銷售資料並輸出到資料庫",
+  "data_source": {
+    "type": "local_file",
+    "path": "data/sales_raw.csv",
+    "format": {
+      "csv": {
+        "delimiter": ",",
+        "has_headers": true
+      }
+    },
+    "encoding": "utf-8"
+  },
+  "transformations": [
+    {
+      "name": "parse_date",
+      "source_field": "sale_date",
+      "target_field": "parsed_date",
+      "transformation": {
+        "type": "convert",
+        "to_type": "date"
+      }
+    },
+    {
+      "name": "calculate_monthly_total",
+      "source_field": "amount",
+      "target_field": "monthly_total",
+      "transformation": {
+        "type": "aggregate",
+        "operation": "sum",
+        "group_by": ["customer_id", "month"]
+      }
+    },
+    {
+      "name": "customer_segment",
+      "source_field": "total_purchases",
+      "target_field": "segment",
+      "transformation": {
+        "type": "calculate",
+        "expression": "if total_purchases > 1000 then 'VIP' elif total_purchases > 500 then 'Premium' else 'Regular'"
+      }
+    },
+    {
+      "name": "format_customer_name",
+      "source_field": "first_name",
+      "target_field": "full_name", 
+      "transformation": {
+        "type": "format",
+        "template": "{first_name} {last_name}"
+      }
+    },
+    {
+      "name": "filter_high_value",
+      "source_field": "amount",
+      "transformation": {
+        "type": "filter",
+        "condition": "amount >= 100"
+      },
+      "condition": {
+        "field": "customer_segment",
+        "operator": "in",
+        "value": ["VIP", "Premium"]
+      }
+    }
+  ],
+  "output": {
+    "format": {
+      "database": {
+        "table_name": "processed_sales",
+        "mode": "upsert"
+      }
+    },
+    "destination": {
+      "type": "database",
+      "connection_string": "postgresql://user:password@localhost:5432/sales_db",
+      "driver": "postgres"
+    },
+    "options": {
+      "batch_size": 500
+    }
+  },
+  "settings": {
+    "parallel_workers": 2,
+    "memory_limit_mb": 256,
+    "log_level": "debug",
+    "timeout_seconds": 600
+  }
+}
